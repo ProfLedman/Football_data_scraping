@@ -1,14 +1,14 @@
 # FBref Big-5 Fixtures Scraper
 
-A production-quality web application that scrapes Football Reference (FBref) for today's Big-5 league fixtures and generates comprehensive CSV/XLSX reports with team and player data.
+A production-quality web application that scrapes Football Reference (FBref) for today's Big-5 league fixtures and generates CSV/XLSX reports with team and player data.
 
 ## Features
 
 - **Live Fixture Discovery**: Automatically discovers today's fixtures from Premier League, La Liga, Serie A, Bundesliga, and Ligue 1
-- **One-Click Export**: Generate comprehensive reports (CSV/XLSX) for any fixture
+- **One-Click Export**: Generate reports (CSV/XLSX) for any fixture
 - **Real-Time Progress**: Live progress bar with detailed status updates
-- **Anti-Bot Protection**: Robust handling of Cloudflare challenges and decoy pages
-- **Complete Data Extraction**: All team tables + individual player stats including hidden HTML comment tables
+- **Anti-Bot Protection**: handling of Cloudflare challenges and decoy pages
+- **Complete Data Extraction**: All team tables + individual player stats 
 - **Polite Scraping**: Configurable delays and rate limiting to respect FBref servers
 
 ## Quick Start
