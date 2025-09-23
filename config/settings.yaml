@@ -1,0 +1,27 @@
+app:
+  name: "FBref Scraper"
+  version: "1.0.0"
+  debug: false
+
+scraper:
+  request_delay_min: 5
+  request_delay_max: 10
+  max_retries: 3
+  backoff_factor: 1.5
+  timeout: 30
+  headless: true
+
+selenium:
+  window_size: "1920,1080"
+  implicit_wait: 10
+  page_load_timeout: 30
+
+export:
+  default_format: "xlsx"
+  max_file_size_mb: 50
+  keep_files_hours: 24
+
+security:
+  rate_limit_requests: 100
+  rate_limit_period: 3600  # 1 hour
+  enable_proxy: false
