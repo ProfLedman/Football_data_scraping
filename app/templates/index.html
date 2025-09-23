@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FBref Scraper — Futuristic UI</title>
+  <title>FBref Scraper</title>
 
   <!-- Tailwind CDN (good for prototype). Replace with compiled Tailwind for production -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -43,6 +43,21 @@
     .card-lift { transition: transform .25s ease, box-shadow .25s ease; }
     .card-lift:hover { transform: translateY(-6px); box-shadow: 0 10px 30px rgba(2,6,23,0.35); }
     @media (max-width: 640px) { .desktop-only { display: none; } }
+    
+    /* Progress bar styles */
+    .progress-bar {
+      transition: width 0.3s ease;
+    }
+    .generate-btn {
+      transition: all 0.2s ease;
+    }
+    .generate-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .generate-btn.loading {
+      background-color: #6b7280 !important;
+    }
   </style>
 </head>
 <body class="bg-gradient-to-br from-[#060710] via-[#071129] to-[#0f1220] text-slate-100 min-h-screen">
@@ -56,7 +71,7 @@
         </div>
         <div>
           <h1 class="text-2xl font-semibold">FBref Scraper</h1>
-          <p class="text-slate-400 text-sm">Futuristic fixtures explorer — clean, fast, accessible</p>
+          <p class="text-slate-400 text-sm">Clean, fast, accessible fixtures explorer</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
@@ -82,7 +97,7 @@
           </div>
           <div>
             <label for="league" class="text-sm mb-1 block">League</label>
-            <select id="league" name="league" class="w-full p-2 rounded-lg bg-transparent border border-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none" aria-label="Select league">
+            <select id="league" name="league" class="w-full p-2 rounded-lg bg-slate-900 border border-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none" aria-label="Select league">
               <option value="">All Leagues</option>
               <option value="9">Premier League</option>
               <option value="12">La Liga</option>
@@ -117,6 +132,21 @@
             <h2 class="text-lg font-medium">Fixtures</h2>
             <div class="text-sm text-slate-400">Show matches from selected date &amp; league</div>
           </div>
+          
+          <!-- Progress and Status Area -->
+          <div id="global-status" class="mb-4 hidden">
+            <div class="bg-slate-800 rounded-lg p-4">
+              <div class="flex justify-between items-center mb-2">
+                <span id="status-message" class="font-medium">Generating report...</span>
+                <span id="status-percent" class="text-sm">0%</span>
+              </div>
+              <div class="w-full bg-slate-700 rounded-full h-2">
+                <div id="progress-bar" class="bg-indigo-500 h-2 rounded-full progress-bar" style="width: 0%"></div>
+              </div>
+              <div id="status-details" class="text-xs text-slate-400 mt-1"></div>
+            </div>
+          </div>
+
           <div id="status" class="mb-3" aria-live="polite"></div>
           <div class="flex items-center gap-3 mb-4">
             <input id="local-search" placeholder="Filter displayed fixtures" class="flex-1 p-2 rounded-lg bg-transparent border border-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none" aria-label="Filter displayed fixtures" />
@@ -139,20 +169,402 @@
     <footer class="mt-8 text-center text-slate-500 text-sm">Built for prototyping · keyboard accessible · responsive</footer>
   </div>
 
-  <!-- Minimal JS for dark mode toggle (optional, remove if not needed) -->
+  <!-- Complete JavaScript Implementation -->
   <script>
-    document.addEventListener('DOMContentLoaded', ()=>{
-      const darkToggle = document.getElementById('dark-toggle');
-      if(darkToggle){
-        darkToggle.addEventListener('click', ()=>{
-          document.documentElement.classList.toggle('dark');
-          const pressed = darkToggle.getAttribute('aria-pressed') === 'true';
-          darkToggle.setAttribute('aria-pressed', String(!pressed));
-        });
+    // API Endpoints - match your FastAPI backend
+    const API_BASE = window.location.origin;
+    const API_FIXTURES = `${API_BASE}/api/fixtures`;
+    const API_GENERATE_REPORT = `${API_BASE}/api/generate-report`;
+    const API_PROGRESS = `${API_BASE}/api/progress`;
+    const API_DOWNLOAD = `${API_BASE}/api/download`;
+
+    // Utility functions
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+    // State management
+    let currentFixtures = [];
+    let activeTaskId = null;
+    let progressInterval = null;
+
+    // Status management
+    function showStatus(message, type = 'info') {
+      const statusEl = $('#status');
+      const colors = {
+        info: 'text-blue-400',
+        success: 'text-green-400',
+        warning: 'text-yellow-400',
+        error: 'text-red-400'
+      };
+      statusEl.innerHTML = `<div class="text-sm ${colors[type]}">${message}</div>`;
+    }
+
+    function showGlobalProgress(percent, message, details = '') {
+      const globalStatus = $('#global-status');
+      const statusMessage = $('#status-message');
+      const statusPercent = $('#status-percent');
+      const progressBar = $('#progress-bar');
+      const statusDetails = $('#status-details');
+
+      globalStatus.classList.remove('hidden');
+      statusMessage.textContent = message;
+      statusPercent.textContent = `${percent}%`;
+      progressBar.style.width = `${percent}%`;
+      statusDetails.textContent = details;
+    }
+
+    function hideGlobalProgress() {
+      $('#global-status').classList.add('hidden');
+    }
+
+    function createSkeletonCards(count = 6) {
+      const container = document.createElement('div');
+      container.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
+      for (let i = 0; i < count; i++) {
+        const card = document.createElement('div');
+        card.className = 'p-4 rounded-xl skeleton glass';
+        card.style.height = '140px';
+        container.appendChild(card);
       }
-      // Keyboard shortcut for search (optional)
-      document.addEventListener('keydown', (e)=>{ if(e.key === '/') { e.preventDefault(); document.getElementById('search').focus(); } });
+      return container;
+    }
+
+    // Render fixtures with Generate Report buttons
+    function renderFixtures(fixtures) {
+      const container = $('#fixtures');
+      container.innerHTML = '';
+
+      if (!fixtures || fixtures.length === 0) {
+        container.innerHTML = $('#empty-state').outerHTML;
+        return;
+      }
+
+      fixtures.forEach(fixture => {
+        const card = document.createElement('div');
+        card.className = 'glass p-4 rounded-2xl card-lift border border-slate-700';
+        
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-medium text-indigo-300 bg-indigo-900/30 px-2 py-1 rounded">${escapeHtml(fixture.league)}</span>
+            <span class="text-xs text-slate-400">${escapeHtml(fixture.time)}</span>
+          </div>
+          
+          <div class="flex items-center justify-between mb-4">
+            <div class="text-center flex-1">
+              <div class="font-bold text-lg">${escapeHtml(fixture.home_team)}</div>
+              <div class="text-sm text-slate-400 mt-1">Home</div>
+            </div>
+            
+            <div class="mx-3">
+              <div class="text-2xl font-bold text-slate-300">VS</div>
+              <div class="text-xs text-slate-500 text-center mt-1">${escapeHtml(fixture.score || 'TBD')}</div>
+            </div>
+            
+            <div class="text-center flex-1">
+              <div class="font-bold text-lg">${escapeHtml(fixture.away_team)}</div>
+              <div class="text-sm text-slate-400 mt-1">Away</div>
+            </div>
+          </div>
+          
+          <div class="flex gap-2">
+            <button class="generate-btn flex-1 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium focus-ring transition-all"
+                    data-match-id="${escapeHtml(fixture.match_id)}"
+                    data-match-url="${escapeHtml(fixture.match_url)}">
+              <i class="fas fa-download mr-2"></i>Generate Report
+            </button>
+          </div>
+        `;
+
+        // Add event listener to the generate button
+        const generateBtn = card.querySelector('.generate-btn');
+        generateBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          generateMatchReport(fixture.match_id, fixture.match_url, fixture);
+        });
+
+        // Card click handler for details
+        card.addEventListener('click', () => {
+          showFixtureDetails(fixture);
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    function escapeHtml(text) {
+      if (text === null || text === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showFixtureDetails(fixture) {
+      // You can enhance this with a proper modal
+      const details = `
+League: ${fixture.league}
+Date: ${fixture.date} at ${fixture.time}
+Match: ${fixture.home_team} vs ${fixture.away_team}
+Score: ${fixture.score || 'Not played yet'}
+Venue: ${fixture.venue || 'Unknown'}
+      `.trim();
+      
+      // Simple alert for now - consider using a proper modal library
+      alert(details);
+    }
+
+    // API Functions
+    async function fetchFixtures(date, league = '') {
+      const fixturesEl = $('#fixtures');
+      fixturesEl.innerHTML = '';
+      fixturesEl.appendChild(createSkeletonCards());
+      showStatus('Loading fixtures...', 'info');
+
+      try {
+        const params = new URLSearchParams({ date });
+        if (league) params.append('league', league);
+
+        const response = await fetch(`${API_FIXTURES}?${params}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+
+        const data = await response.json();
+        currentFixtures = data.fixtures || [];
+        
+        renderFixtures(currentFixtures);
+        showStatus(`Found ${currentFixtures.length} fixtures`, 'success');
+        
+      } catch (error) {
+        console.error('Error fetching fixtures:', error);
+        showStatus('Failed to load fixtures. Please try again.', 'error');
+        fixturesEl.innerHTML = `
+          <div class="col-span-2 p-6 text-center text-red-400">
+            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+            <p>Error loading fixtures</p>
+            <p class="text-sm mt-2">${error.message}</p>
+          </div>
+        `;
+        currentFixtures = [];
+      }
+    }
+
+    async function generateMatchReport(matchId, matchUrl, fixture) {
+      // Disable the button and show loading state
+      const buttons = $$(`.generate-btn[data-match-id="${matchId}"]`);
+      buttons.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('loading');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+      });
+
+      try {
+        showGlobalProgress(0, 'Starting report generation...', 'Initializing scraping process');
+        
+        const response = await fetch(API_GENERATE_REPORT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            match_url: matchUrl,
+            match_id: matchId,
+            format: 'xlsx'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+
+        const data = await response.json();
+        activeTaskId = data.task_id;
+        
+        // Start polling for progress
+        startProgressPolling(activeTaskId, fixture);
+        
+      } catch (error) {
+        console.error('Error starting report generation:', error);
+        showStatus('Failed to start report generation', 'error');
+        
+        // Re-enable buttons
+        buttons.forEach(btn => {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          btn.innerHTML = '<i class="fas fa-download mr-2"></i>Generate Report';
+        });
+        
+        hideGlobalProgress();
+      }
+    }
+
+    function startProgressPolling(taskId, fixture) {
+      if (progressInterval) clearInterval(progressInterval);
+      
+      progressInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`${API_PROGRESS}/${taskId}`);
+          if (!response.ok) throw new Error('Progress check failed');
+          
+          const progress = await response.json();
+          
+          showGlobalProgress(
+            progress.progress, 
+            progress.message,
+            `Task: ${taskId}`
+          );
+
+          if (progress.status === 'completed') {
+            clearInterval(progressInterval);
+            showGlobalProgress(100, 'Report complete! Downloading...', 'Finalizing file');
+            
+            // Download the report
+            setTimeout(() => downloadReport(taskId, fixture), 1000);
+            
+          } else if (progress.status === 'error') {
+            clearInterval(progressInterval);
+            showStatus(`Report generation failed: ${progress.message}`, 'error');
+            hideGlobalProgress();
+            resetGenerateButtons();
+          }
+          
+        } catch (error) {
+          console.error('Progress polling error:', error);
+        }
+      }, 1000);
+    }
+
+    function downloadReport(taskId, fixture) {
+      try {
+        const link = document.createElement('a');
+        link.href = `${API_DOWNLOAD}/${taskId}`;
+        link.download = `fbref_report_${fixture.home_team}_vs_${fixture.away_team}_${fixture.date}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showStatus('Report downloaded successfully!', 'success');
+        
+      } catch (error) {
+        console.error('Download error:', error);
+        showStatus('Download failed. Please try again.', 'error');
+      } finally {
+        setTimeout(() => {
+          hideGlobalProgress();
+          resetGenerateButtons();
+          activeTaskId = null;
+        }, 2000);
+      }
+    }
+
+    function resetGenerateButtons() {
+      $$('.generate-btn').forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.innerHTML = '<i class="fas fa-download mr-2"></i>Generate Report';
+      });
+    }
+
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set today's date as default
+      const today = new Date().toISOString().split('T')[0];
+      $('#date').value = today;
+
+      // Load today's fixtures automatically
+      setTimeout(() => fetchFixtures(today), 500);
+
+      // Search form submission
+      $('#search-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const date = $('#date').value;
+        const league = $('#league').value;
+        fetchFixtures(date, league);
+      });
+
+      // Clear button
+      $('#clear-btn').addEventListener('click', () => {
+        $('#date').value = today;
+        $('#league').value = '';
+        $('#search').value = '';
+        fetchFixtures(today, '');
+      });
+
+      // Local search filter
+      $('#local-search').addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filtered = currentFixtures.filter(fixture => 
+          fixture.home_team.toLowerCase().includes(searchTerm) ||
+          fixture.away_team.toLowerCase().includes(searchTerm) ||
+          fixture.league.toLowerCase().includes(searchTerm)
+        );
+        renderFixtures(filtered);
+      });
+
+      // Sort functionality
+      $('#sort').addEventListener('change', (e) => {
+        const sortBy = e.target.value;
+        const sorted = [...currentFixtures].sort((a, b) => {
+          switch (sortBy) {
+            case 'time': return (a.time || '').localeCompare(b.time || '');
+            case 'home': return (a.home_team || '').localeCompare(b.home_team || '');
+            case 'away': return (a.away_team || '').localeCompare(b.away_team || '');
+            default: return 0;
+          }
+        });
+        renderFixtures(sorted);
+      });
+
+      // Export buttons
+      $('#export-csv').addEventListener('click', () => exportFixtures('csv'));
+      $('#export-xlsx').addEventListener('click', () => exportFixtures('xlsx'));
+      $('#export-btn').addEventListener('click', () => exportFixtures('csv'));
+
+      // Dark mode toggle
+      $('#dark-toggle').addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        $('#dark-toggle').setAttribute('aria-pressed', isDark);
+        $('#dark-toggle').querySelector('span').textContent = isDark ? 'Light' : 'Dark';
+        $('#dark-toggle').querySelector('i').className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+      });
+
+      // Keyboard shortcut for search
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          $('#search').focus();
+        }
+      });
     });
+
+    // Export functionality for fixture lists
+    function exportFixtures(format) {
+      if (!currentFixtures.length) {
+        showStatus('No fixtures to export', 'warning');
+        return;
+      }
+
+      const headers = ['League', 'Date', 'Time', 'Home Team', 'Away Team', 'Score', 'Match ID'];
+      const csvContent = [
+        headers.join(','),
+        ...currentFixtures.map(f => [
+          f.league, f.date, f.time, f.home_team, f.away_team, f.score || '', f.match_id
+        ].map(field => `"${String(field || '').replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fbref_fixtures_${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showStatus(`Fixtures exported as ${format.toUpperCase()}`, 'success');
+    }
   </script>
 </body>
 </html>

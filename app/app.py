@@ -4,13 +4,21 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 import uuid
+import os
 from typing import Dict, Optional
 
 from app.config import settings
 from app.services.task_manager import TaskManager
 from app.scraper.core import FBrefScraper
 from app.exporter.excel_exporter import ExcelExporter
+
+# Pydantic model for generate-report request
+class GenerateReportRequest(BaseModel):
+    match_url: str
+    match_id: str
+    format: str = "xlsx"
 
 # Global task manager
 task_manager = TaskManager()
@@ -19,6 +27,8 @@ task_manager = TaskManager()
 async def lifespan(app: FastAPI):
     # Startup
     print("Starting FBref Scraper Web App...")
+    # Ensure data directory exists
+    os.makedirs("data/exports", exist_ok=True)
     yield
     # Cleanup
     print("Shutting down FBref Scraper Web App...")
@@ -73,23 +83,29 @@ async def get_fixtures(date: str, league: Optional[str] = None):
 @app.post("/api/generate-report")
 async def generate_report(
     background_tasks: BackgroundTasks,
-    match_url: str,
-    match_id: str,
-    format: str = "xlsx"
+    request: GenerateReportRequest
 ):
     """Start generating a report for a specific match"""
     task_id = str(uuid.uuid4())
     
     # Initialize task
     task_manager.create_task(task_id, {
-        "match_url": match_url,
-        "match_id": match_id,
-        "format": format,
-        "status": "initializing"
+        "match_url": request.match_url,
+        "match_id": request.match_id,
+        "format": request.format,
+        "status": "initializing",
+        "progress": 0,
+        "message": "Starting report generation..."
     })
     
     # Start background task
-    background_tasks.add_task(generate_report_task, task_id, match_url, match_id, format)
+    background_tasks.add_task(
+        generate_report_task, 
+        task_id, 
+        request.match_url, 
+        request.match_id, 
+        request.format
+    )
     
     return {"task_id": task_id, "status": "started"}
 
@@ -100,7 +116,14 @@ async def get_progress(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    return task
+    return {
+        "task_id": task_id,
+        "status": task.get("status", "unknown"),
+        "progress": task.get("progress", 0),
+        "message": task.get("message", ""),
+        "match_url": task.get("match_url"),
+        "match_id": task.get("match_id")
+    }
 
 @app.get("/api/download/{task_id}")
 async def download_report(task_id: str):
@@ -112,32 +135,53 @@ async def download_report(task_id: str):
     if task["status"] != "completed":
         raise HTTPException(status_code=400, detail="Report not ready")
     
-    if "file_path" not in task:
-        raise HTTPException(status_code=500, detail="No file available")
+    if "file_path" not in task or not os.path.exists(task["file_path"]):
+        raise HTTPException(status_code=500, detail="Report file not found")
+    
+    # Generate a better filename
+    filename = f"fbref_report_{task_id}.xlsx"
+    if "match_id" in task:
+        filename = f"fbref_report_{task['match_id']}.xlsx"
     
     return StreamingResponse(
         open(task["file_path"], "rb"),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=report_{task_id}.xlsx"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 async def generate_report_task(task_id: str, match_url: str, match_id: str, format: str):
     """Background task to generate report"""
     try:
-        task_manager.update_task(task_id, {"status": "discovering_fixture", "progress": 10})
+        task_manager.update_task(task_id, {
+            "status": "discovering_fixture", 
+            "progress": 10,
+            "message": "Discovering fixture details..."
+        })
         
         scraper = FBrefScraper()
         exporter = ExcelExporter()
         
         # Scrape match data
-        task_manager.update_task(task_id, {"status": "scraping_teams", "progress": 30})
+        task_manager.update_task(task_id, {
+            "status": "scraping_teams", 
+            "progress": 30,
+            "message": "Scraping team statistics..."
+        })
         match_data = scraper.scrape_match_data(match_url)
         
-        task_manager.update_task(task_id, {"status": "scraping_players", "progress": 60})
+        task_manager.update_task(task_id, {
+            "status": "scraping_players", 
+            "progress": 60,
+            "message": "Scraping player data..."
+        })
         player_data = scraper.scrape_player_data(match_data)
         
         # Generate report
-        task_manager.update_task(task_id, {"status": "building_file", "progress": 80})
+        task_manager.update_task(task_id, {
+            "status": "building_file", 
+            "progress": 80,
+            "message": "Building Excel file..."
+        })
         file_path = exporter.export_match_report(match_data, player_data, task_id)
         
         task_manager.update_task(task_id, {
@@ -148,8 +192,16 @@ async def generate_report_task(task_id: str, match_url: str, match_id: str, form
         })
         
     except Exception as e:
+        error_message = f"Error generating report: {str(e)}"
+        print(error_message)
         task_manager.update_task(task_id, {
             "status": "error",
             "progress": 100,
-            "message": f"Error: {str(e)}"
+            "message": error_message
         })
+
+# Health check endpoint
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": "FBref Scraper"}
