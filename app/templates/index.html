@@ -1,67 +1,158 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FBref Scraper</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="/static/css/style.css" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FBref Scraper — Futuristic UI</title>
+
+  <!-- Tailwind CDN (good for prototype). Replace with compiled Tailwind for production -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: { glass: 'rgba(255,255,255,0.06)' },
+          dropShadow: { 'soft': '0 6px 18px rgba(13, 17, 23, 0.24)' }
+        }
+      }
+    }
+  </script>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+
+  <style>
+    :root { --glass-bg: rgba(255,255,255,0.06); --glass-border: rgba(255,255,255,0.08); }
+    .glass {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      backdrop-filter: blur(8px) saturate(110%);
+      -webkit-backdrop-filter: blur(8px) saturate(110%);
+      border: 1px solid var(--glass-border);
+    }
+    .focus-ring:focus {
+      outline: 3px solid rgba(99,102,241,0.18);
+      outline-offset: 2px;
+    }
+    @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%);
+      background-size: 800px 100%;
+      animation: shimmer 1.2s linear infinite;
+    }
+    .card-lift { transition: transform .25s ease, box-shadow .25s ease; }
+    .card-lift:hover { transform: translateY(-6px); box-shadow: 0 10px 30px rgba(2,6,23,0.35); }
+    @media (max-width: 640px) { .desktop-only { display: none; } }
+  </style>
 </head>
-<body>
-    <div class="container-fluid">
-        <header class="row bg-primary text-white p-3 mb-4">
-            <div class="col">
-                <h1><i class="fas fa-futbol"></i> FBref Scraper</h1>
-                <p class="mb-0">Advanced football data extraction tool</p>
-            </div>
-        </header>
+<body class="bg-gradient-to-br from-[#060710] via-[#071129] to-[#0f1220] text-slate-100 min-h-screen">
 
-        <div class="row">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Search Fixtures</h5>
-                        <form id="search-form">
-                            <div class="mb-3">
-                                <label for="date-selector" class="form-label">Date</label>
-                                <input type="date" id="date-selector" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="league-selector" class="form-label">League</label>
-                                <select id="league-selector" class="form-select">
-                                    <option value="">All Leagues</option>
-                                    <option value="9">Premier League</option>
-                                    <option value="12">La Liga</option>
-                                    <option value="11">Serie A</option>
-                                    <option value="20">Bundesliga</option>
-                                    <option value="13">Ligue 1</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-search"></i> Search Fixtures
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Fixtures</h5>
-                        <div id="fixtures-container">
-                            <div class="text-center py-5 text-muted">
-                                <i class="fas fa-search fa-3x mb-3"></i>
-                                <p>Select a date to view fixtures</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <div class="max-w-6xl mx-auto p-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl glass flex items-center justify-center text-2xl text-indigo-300 shadow-soft">
+          <i class="fas fa-futbol"></i>
         </div>
-    </div>
+        <div>
+          <h1 class="text-2xl font-semibold">FBref Scraper</h1>
+          <p class="text-slate-400 text-sm">Futuristic fixtures explorer — clean, fast, accessible</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="dark-toggle" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg glass focus-ring" aria-pressed="false" title="Toggle dark/light">
+          <i class="fa-solid fa-moon"></i>
+          <span class="desktop-only text-sm text-slate-300">Dark</span>
+        </button>
+        <nav aria-label="Top actions" class="inline-flex items-center gap-2">
+          <button id="export-btn" class="bg-indigo-500 hover:bg-indigo-600 active:scale-95 text-white px-3 py-2 rounded-lg shadow-md focus-ring" title="Export displayed fixtures">Export</button>
+        </nav>
+      </div>
+    </header>
 
-    <script src="/static/js/app.js"></script>
+    <main class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Sidebar controls -->
+      <aside class="md:col-span-1 glass rounded-2xl p-5 shadow-soft" aria-labelledby="filters-heading">
+        <h2 id="filters-heading" class="text-lg font-medium mb-3">Find fixtures</h2>
+        <form id="search-form" class="space-y-4" aria-describedby="filters-desc">
+          <p id="filters-desc" class="sr-only">Choose date, league and refine results</p>
+          <div>
+            <label for="date" class="text-sm mb-1 block">Date</label>
+            <input id="date" name="date" type="date" class="w-full p-2 rounded-lg bg-transparent border border-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:ring-offset-0 focus:border-indigo-400" aria-label="Select date" />
+          </div>
+          <div>
+            <label for="league" class="text-sm mb-1 block">League</label>
+            <select id="league" name="league" class="w-full p-2 rounded-lg bg-transparent border border-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none" aria-label="Select league">
+              <option value="">All Leagues</option>
+              <option value="9">Premier League</option>
+              <option value="12">La Liga</option>
+              <option value="11">Serie A</option>
+              <option value="20">Bundesliga</option>
+              <option value="13">Ligue 1</option>
+            </select>
+          </div>
+          <div>
+            <label for="search" class="text-sm mb-1 block">Search teams</label>
+            <input id="search" name="search" type="search" placeholder="Team name, stadium, referee..." class="w-full p-2 rounded-lg bg-transparent border border-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none" aria-label="Search fixtures" />
+          </div>
+          <div class="flex gap-2">
+            <button type="submit" id="fetch-btn" class="flex-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-medium focus-ring" aria-live="polite">
+              <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
+            </button>
+            <button type="button" id="clear-btn" class="px-4 py-2 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 focus-ring" title="Clear filters">Clear</button>
+          </div>
+          <div class="mt-2 text-xs text-slate-400">Tip: Use the search to quickly filter teams.</div>
+        </form>
+        <hr class="my-4 border-slate-700" />
+        <div class="flex gap-2">
+          <button id="export-csv" class="flex-1 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white focus-ring"><i class="fa-solid fa-file-csv mr-2"></i>CSV</button>
+          <button id="export-xlsx" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-900 focus-ring"><i class="fa-solid fa-file-excel mr-2"></i>XLSX</button>
+        </div>
+      </aside>
+
+      <!-- Fixtures list -->
+      <section id="fixtures-panel" class="md:col-span-2">
+        <div class="glass rounded-2xl p-4 shadow-soft">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-medium">Fixtures</h2>
+            <div class="text-sm text-slate-400">Show matches from selected date &amp; league</div>
+          </div>
+          <div id="status" class="mb-3" aria-live="polite"></div>
+          <div class="flex items-center gap-3 mb-4">
+            <input id="local-search" placeholder="Filter displayed fixtures" class="flex-1 p-2 rounded-lg bg-transparent border border-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none" aria-label="Filter displayed fixtures" />
+            <select id="sort" class="p-2 rounded-lg bg-transparent border border-slate-700" aria-label="Sort fixtures">
+              <option value="time">Sort: Kick-off</option>
+              <option value="home">Home team</option>
+              <option value="away">Away team</option>
+            </select>
+          </div>
+          <div id="fixtures" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div id="empty-state" class="w-full p-8 text-center text-slate-400">
+              <i class="fa-regular fa-clock fa-2x mb-3"></i>
+              <p>Select a date and click Search to load fixtures.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mt-8 text-center text-slate-500 text-sm">Built for prototyping · keyboard accessible · responsive</footer>
+  </div>
+
+  <!-- Minimal JS for dark mode toggle (optional, remove if not needed) -->
+  <script>
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const darkToggle = document.getElementById('dark-toggle');
+      if(darkToggle){
+        darkToggle.addEventListener('click', ()=>{
+          document.documentElement.classList.toggle('dark');
+          const pressed = darkToggle.getAttribute('aria-pressed') === 'true';
+          darkToggle.setAttribute('aria-pressed', String(!pressed));
+        });
+      }
+      // Keyboard shortcut for search (optional)
+      document.addEventListener('keydown', (e)=>{ if(e.key === '/') { e.preventDefault(); document.getElementById('search').focus(); } });
+    });
+  </script>
 </body>
 </html>
