@@ -26,11 +26,11 @@ class Settings(BaseSettings):
     DEFAULT_FORMAT: str = "xlsx"
     MAX_FILE_SIZE_MB: int = 50
     KEEP_FILES_HOURS: int = 24
+    OUTPUT_DIR: str = "data/exports"
     
     # Security settings
     RATE_LIMIT_REQUESTS: int = 100
-    RATE_LIMIT_PERIOD: int = 3600  # 1 hour
-    ENABLE_PROXY: bool = False
+    RATE_LIMIT_PERIOD: int = 3600
     
     class Config:
         env_file = ".env"
@@ -41,7 +41,17 @@ def load_settings() -> Settings:
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
             config_data = yaml.safe_load(f)
-        return Settings(**config_data)
+        
+        # Flatten the nested YAML structure
+        flattened_config = {}
+        for section, values in config_data.items():
+            if isinstance(values, dict):
+                for key, value in values.items():
+                    flattened_config[f"{section.upper()}_{key.upper()}"] = value
+            else:
+                flattened_config[section.upper()] = values
+        
+        return Settings(**flattened_config)
     return Settings()
 
 settings = load_settings()
