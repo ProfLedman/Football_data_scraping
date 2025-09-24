@@ -169,7 +169,7 @@
     <footer class="mt-8 text-center text-slate-500 text-sm">Built for prototyping · keyboard accessible · responsive</footer>
   </div>
 
-  <!-- Complete JavaScript Implementation -->
+  <!-- JavaScript Implementation with Null Safety -->
   <script>
     // API Endpoints - match your FastAPI backend
     const API_BASE = window.location.origin;
@@ -182,6 +182,14 @@
     const $ = (selector) => document.querySelector(selector);
     const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
+    // Store empty state HTML as constant to avoid DOM issues
+    const EMPTY_STATE_HTML = `
+      <div class="w-full p-8 text-center text-slate-400">
+        <i class="fa-regular fa-clock fa-2x mb-3"></i>
+        <p>Select a date and click Search to load fixtures.</p>
+      </div>
+    `;
+
     // State management
     let currentFixtures = [];
     let activeTaskId = null;
@@ -190,13 +198,15 @@
     // Status management
     function showStatus(message, type = 'info') {
       const statusEl = $('#status');
+      if (!statusEl) return;
+      
       const colors = {
         info: 'text-blue-400',
         success: 'text-green-400',
         warning: 'text-yellow-400',
         error: 'text-red-400'
       };
-      statusEl.innerHTML = `<div class="text-sm ${colors[type]}">${message}</div>`;
+      statusEl.innerHTML = message ? `<div class="text-sm ${colors[type]}">${message}</div>` : '';
     }
 
     function showGlobalProgress(percent, message, details = '') {
@@ -206,6 +216,8 @@
       const progressBar = $('#progress-bar');
       const statusDetails = $('#status-details');
 
+      if (!globalStatus || !statusMessage || !statusPercent || !progressBar || !statusDetails) return;
+
       globalStatus.classList.remove('hidden');
       statusMessage.textContent = message;
       statusPercent.textContent = `${percent}%`;
@@ -214,7 +226,8 @@
     }
 
     function hideGlobalProgress() {
-      $('#global-status').classList.add('hidden');
+      const globalStatus = $('#global-status');
+      if (globalStatus) globalStatus.classList.add('hidden');
     }
 
     function createSkeletonCards(count = 6) {
@@ -229,13 +242,16 @@
       return container;
     }
 
-    // Render fixtures with Generate Report buttons
+    // Render fixtures with Generate Report buttons - FIXED NULL SAFETY
     function renderFixtures(fixtures) {
       const container = $('#fixtures');
+      if (!container) return;
+      
       container.innerHTML = '';
 
       if (!fixtures || fixtures.length === 0) {
-        container.innerHTML = $('#empty-state').outerHTML;
+        // Use the constant instead of trying to access removed DOM element
+        container.innerHTML = EMPTY_STATE_HTML;
         return;
       }
 
@@ -277,10 +293,12 @@
 
         // Add event listener to the generate button
         const generateBtn = card.querySelector('.generate-btn');
-        generateBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          generateMatchReport(fixture.match_id, fixture.match_url, fixture);
-        });
+        if (generateBtn) {
+          generateBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            generateMatchReport(fixture.match_id, fixture.match_url, fixture);
+          });
+        }
 
         // Card click handler for details
         card.addEventListener('click', () => {
@@ -299,7 +317,6 @@
     }
 
     function showFixtureDetails(fixture) {
-      // You can enhance this with a proper modal
       const details = `
 League: ${fixture.league}
 Date: ${fixture.date} at ${fixture.time}
@@ -308,13 +325,14 @@ Score: ${fixture.score || 'Not played yet'}
 Venue: ${fixture.venue || 'Unknown'}
       `.trim();
       
-      // Simple alert for now - consider using a proper modal library
       alert(details);
     }
 
     // API Functions
     async function fetchFixtures(date, league = '') {
       const fixturesEl = $('#fixtures');
+      if (!fixturesEl) return;
+      
       fixturesEl.innerHTML = '';
       fixturesEl.appendChild(createSkeletonCards());
       showStatus('Loading fixtures...', 'info');
@@ -353,9 +371,11 @@ Venue: ${fixture.venue || 'Unknown'}
       // Disable the button and show loading state
       const buttons = $$(`.generate-btn[data-match-id="${matchId}"]`);
       buttons.forEach(btn => {
-        btn.disabled = true;
-        btn.classList.add('loading');
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+        if (btn) {
+          btn.disabled = true;
+          btn.classList.add('loading');
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+        }
       });
 
       try {
@@ -389,9 +409,11 @@ Venue: ${fixture.venue || 'Unknown'}
         
         // Re-enable buttons
         buttons.forEach(btn => {
-          btn.disabled = false;
-          btn.classList.remove('loading');
-          btn.innerHTML = '<i class="fas fa-download mr-2"></i>Generate Report';
+          if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btn.innerHTML = '<i class="fas fa-download mr-2"></i>Generate Report';
+          }
         });
         
         hideGlobalProgress();
@@ -459,84 +481,13 @@ Venue: ${fixture.venue || 'Unknown'}
 
     function resetGenerateButtons() {
       $$('.generate-btn').forEach(btn => {
-        btn.disabled = false;
-        btn.classList.remove('loading');
-        btn.innerHTML = '<i class="fas fa-download mr-2"></i>Generate Report';
-      });
-    }
-
-    // Event Listeners
-    document.addEventListener('DOMContentLoaded', () => {
-      // Set today's date as default
-      const today = new Date().toISOString().split('T')[0];
-      $('#date').value = today;
-
-      // Load today's fixtures automatically
-      setTimeout(() => fetchFixtures(today), 500);
-
-      // Search form submission
-      $('#search-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const date = $('#date').value;
-        const league = $('#league').value;
-        fetchFixtures(date, league);
-      });
-
-      // Clear button
-      $('#clear-btn').addEventListener('click', () => {
-        $('#date').value = today;
-        $('#league').value = '';
-        $('#search').value = '';
-        fetchFixtures(today, '');
-      });
-
-      // Local search filter
-      $('#local-search').addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const filtered = currentFixtures.filter(fixture => 
-          fixture.home_team.toLowerCase().includes(searchTerm) ||
-          fixture.away_team.toLowerCase().includes(searchTerm) ||
-          fixture.league.toLowerCase().includes(searchTerm)
-        );
-        renderFixtures(filtered);
-      });
-
-      // Sort functionality
-      $('#sort').addEventListener('change', (e) => {
-        const sortBy = e.target.value;
-        const sorted = [...currentFixtures].sort((a, b) => {
-          switch (sortBy) {
-            case 'time': return (a.time || '').localeCompare(b.time || '');
-            case 'home': return (a.home_team || '').localeCompare(b.home_team || '');
-            case 'away': return (a.away_team || '').localeCompare(b.away_team || '');
-            default: return 0;
-          }
-        });
-        renderFixtures(sorted);
-      });
-
-      // Export buttons
-      $('#export-csv').addEventListener('click', () => exportFixtures('csv'));
-      $('#export-xlsx').addEventListener('click', () => exportFixtures('xlsx'));
-      $('#export-btn').addEventListener('click', () => exportFixtures('csv'));
-
-      // Dark mode toggle
-      $('#dark-toggle').addEventListener('click', () => {
-        document.documentElement.classList.toggle('dark');
-        const isDark = document.documentElement.classList.contains('dark');
-        $('#dark-toggle').setAttribute('aria-pressed', isDark);
-        $('#dark-toggle').querySelector('span').textContent = isDark ? 'Light' : 'Dark';
-        $('#dark-toggle').querySelector('i').className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-      });
-
-      // Keyboard shortcut for search
-      document.addEventListener('keydown', (e) => {
-        if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          $('#search').focus();
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          btn.innerHTML = '<i class="fas fa-download mr-2"></i>Generate Report';
         }
       });
-    });
+    }
 
     // Export functionality for fixture lists
     function exportFixtures(format) {
@@ -565,6 +516,104 @@ Venue: ${fixture.venue || 'Unknown'}
 
       showStatus(`Fixtures exported as ${format.toUpperCase()}`, 'success');
     }
+
+    // Event Listeners with Null Safety
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set today's date as default
+      const today = new Date().toISOString().split('T')[0];
+      const dateInput = $('#date');
+      if (dateInput) dateInput.value = today;
+
+      // Load today's fixtures automatically
+      setTimeout(() => fetchFixtures(today), 500);
+
+      // Search form submission
+      const searchForm = $('#search-form');
+      if (searchForm) {
+        searchForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const date = $('#date')?.value || today;
+          const league = $('#league')?.value || '';
+          fetchFixtures(date, league);
+        });
+      }
+
+      // Clear button
+      const clearBtn = $('#clear-btn');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          if ($('#date')) $('#date').value = today;
+          if ($('#league')) $('#league').value = '';
+          if ($('#search')) $('#search').value = '';
+          fetchFixtures(today, '');
+        });
+      }
+
+      // Local search filter
+      const localSearch = $('#local-search');
+      if (localSearch) {
+        localSearch.addEventListener('input', (e) => {
+          const searchTerm = e.target.value.toLowerCase();
+          const filtered = currentFixtures.filter(fixture => 
+            fixture.home_team.toLowerCase().includes(searchTerm) ||
+            fixture.away_team.toLowerCase().includes(searchTerm) ||
+            (fixture.league && fixture.league.toLowerCase().includes(searchTerm))
+          );
+          renderFixtures(filtered);
+        });
+      }
+
+      // Sort functionality
+      const sortSelect = $('#sort');
+      if (sortSelect) {
+        sortSelect.addEventListener('change', (e) => {
+          const sortBy = e.target.value;
+          const sorted = [...currentFixtures].sort((a, b) => {
+            switch (sortBy) {
+              case 'time': return (a.time || '').localeCompare(b.time || '');
+              case 'home': return (a.home_team || '').localeCompare(b.home_team || '');
+              case 'away': return (a.away_team || '').localeCompare(b.away_team || '');
+              default: return 0;
+            }
+          });
+          renderFixtures(sorted);
+        });
+      }
+
+      // Export buttons
+      const exportCsv = $('#export-csv');
+      const exportXlsx = $('#export-xlsx');
+      const exportBtn = $('#export-btn');
+      
+      if (exportCsv) exportCsv.addEventListener('click', () => exportFixtures('csv'));
+      if (exportXlsx) exportXlsx.addEventListener('click', () => exportFixtures('xlsx'));
+      if (exportBtn) exportBtn.addEventListener('click', () => exportFixtures('csv'));
+
+      // Dark mode toggle
+      const darkToggle = $('#dark-toggle');
+      if (darkToggle) {
+        darkToggle.addEventListener('click', () => {
+          document.documentElement.classList.toggle('dark');
+          const isDark = document.documentElement.classList.contains('dark');
+          darkToggle.setAttribute('aria-pressed', isDark);
+          
+          const span = darkToggle.querySelector('span');
+          const icon = darkToggle.querySelector('i');
+          
+          if (span) span.textContent = isDark ? 'Light' : 'Dark';
+          if (icon) icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        });
+      }
+
+      // Keyboard shortcut for search
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          const searchInput = $('#search');
+          if (searchInput) searchInput.focus();
+        }
+      });
+    });
   </script>
 </body>
 </html>

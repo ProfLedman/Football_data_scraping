@@ -4,8 +4,8 @@ from app.config import settings
 
 class AntiBotHandler:
     def __init__(self):
-        self.delay_min = settings.REQUEST_DELAY_MIN
-        self.delay_max = settings.REQUEST_DELAY_MAX
+        self.delay_min = settings.SCRAPER_REQUEST_DELAY_MIN
+        self.delay_max = settings.SCRAPER_REQUEST_DELAY_MAX
         self.retry_count = 0
     
     def random_delay(self, min_delay=None, max_delay=None):
@@ -16,14 +16,14 @@ class AntiBotHandler:
     
     def exponential_backoff(self, attempt):
         base_delay = self.delay_min
-        backoff_delay = base_delay * (settings.BACKOFF_FACTOR ** attempt)
+        backoff_delay = base_delay * (settings.SCRAPER_BACKOFF_FACTOR ** attempt)
         max_delay = self.delay_max * 3
         delay = min(backoff_delay, max_delay)
         time.sleep(delay)
     
     def should_retry(self):
         self.retry_count += 1
-        return self.retry_count <= settings.MAX_RETRIES
+        return self.retry_count <= settings.SCRAPER_MAX_RETRIES
     
     def reset_retry_count(self):
         self.retry_count = 0
