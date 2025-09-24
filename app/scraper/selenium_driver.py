@@ -4,6 +4,10 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from app.config import settings
 
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 def get_driver(headless: bool = None):
     """Get configured Chrome driver"""
     if headless is None:
@@ -47,3 +51,26 @@ def get_random_user_agent():
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
     ]
     return random.choice(user_agents)
+
+def safe_get(driver, url, timeout=None):
+    """Safely get a URL with optional timeout handling."""
+    try:
+        if timeout:
+            driver.set_page_load_timeout(timeout)
+        driver.get(url)
+        return True
+    except Exception as e:
+        print(f"Error loading {url}: {e}")
+        return False
+    
+
+def wait_for_element(driver, by, value, timeout=10):
+    """Wait for an element to be present and return it."""
+    try:
+        element = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((by, value))
+        )
+        return element
+    except Exception as e:
+        print(f"Element not found: {value} ({by}) - {e}")
+        return None
