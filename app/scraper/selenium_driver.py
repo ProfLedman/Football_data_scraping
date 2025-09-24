@@ -11,7 +11,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 def get_driver(headless: bool = None):
-    """Get configured Chrome driver"""
+    """Get configured Chrome driver with better error handling"""
     if headless is None:
         headless = settings.SCRAPER_HEADLESS
     
@@ -27,22 +27,38 @@ def get_driver(headless: bool = None):
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
+    # Disable GCM to avoid authentication errors
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-dev-tools")
+    chrome_options.add_argument("--no-first-run")
+    chrome_options.add_argument("--no-default-browser-check")
+    chrome_options.add_argument("--disable-component-extensions-with-background-pages")
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    
     # Set window size and user agent
     chrome_options.add_argument(f"--window-size={settings.SELENIUM_WINDOW_SIZE}")
     chrome_options.add_argument(f"--user-agent={get_random_user_agent()}")
     
-    # Initialize driver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    
-    # Additional anti-detection
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    
-    # Set timeouts
-    driver.implicitly_wait(settings.SELENIUM_IMPLICIT_WAIT)
-    driver.set_page_load_timeout(settings.SELENIUM_PAGE_LOAD_TIMEOUT)
-    
-    return driver
+    try:
+        # Initialize driver
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        # Additional anti-detection
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
+        # Set timeouts
+        driver.implicitly_wait(settings.SELENIUM_IMPLICIT_WAIT)
+        driver.set_page_load_timeout(settings.SELENIUM_PAGE_LOAD_TIMEOUT)
+        
+        return driver
+    except Exception as e:
+        print(f"Error creating Chrome driver: {e}")
+        raise
+
 
 def get_random_user_agent():
     """Get random user agent from list"""

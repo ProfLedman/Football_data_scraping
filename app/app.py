@@ -151,45 +151,40 @@ async def download_report(task_id: str):
     )
 
 async def generate_report_task(task_id: str, match_url: str, match_id: str, format: str):
-    """Background task to generate report"""
+    """Background task to generate report - FIXTURES ONLY VERSION"""
     try:
         task_manager.update_task(task_id, {
             "status": "discovering_fixture", 
-            "progress": 10,
+            "progress": 20,
             "message": "Discovering fixture details..."
         })
         
         scraper = FBrefScraper()
         exporter = ExcelExporter()
         
-        # Scrape match data
+        # Scrape match data ONLY (no player data)
         task_manager.update_task(task_id, {
             "status": "scraping_teams", 
-            "progress": 30,
+            "progress": 60,
             "message": "Scraping team statistics..."
         })
         match_data = scraper.scrape_match_data(match_url)
         
-        task_manager.update_task(task_id, {
-            "status": "scraping_players", 
-            "progress": 60,
-            "message": "Scraping player data..."
-        })
-        player_data = scraper.scrape_player_data(match_data)
-        
-        # Generate report
+        # SKIP PLAYER DATA COLLECTION FOR NOW
         task_manager.update_task(task_id, {
             "status": "building_file", 
             "progress": 80,
-            "message": "Building Excel file..."
+            "message": "Building Excel file with fixture data..."
         })
-        file_path = exporter.export_match_report(match_data, player_data, task_id)
+        
+        # Pass empty dict for player_data
+        file_path = exporter.export_match_report(match_data, {}, task_id)
         
         task_manager.update_task(task_id, {
             "status": "completed", 
             "progress": 100,
             "file_path": file_path,
-            "message": "Report generation complete"
+            "message": "Fixture report generation complete"
         })
         
     except Exception as e:
@@ -206,3 +201,10 @@ async def generate_report_task(task_id: str, match_url: str, match_id: str, form
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "FBref Scraper"}
+
+@app.get("/api/debug/fixtures")
+async def debug_fixtures(date: str, league: Optional[str] = None):
+    """Debug endpoint to see raw fixture data"""
+    scraper = FBrefScraper()
+    fixtures = scraper.get_fixtures_by_date(date, league)
+    return {"fixtures": fixtures}

@@ -368,6 +368,15 @@ Venue: ${fixture.venue || 'Unknown'}
     }
 
     async function generateMatchReport(matchId, matchUrl, fixture) {
+          console.log('DEBUG - Match URL being sent:', matchUrl);
+          console.log('DEBUG - Full fixture object:', fixture);
+          
+          // Validate the URL before sending
+          if (!matchUrl || matchUrl === 'string' || !matchUrl.startsWith('/en/matches/')) {
+              showStatus('Invalid match URL. Please select a valid fixture.', 'error');
+              return;
+          }
+
       // Disable the button and show loading state
       const buttons = $$(`.generate-btn[data-match-id="${matchId}"]`);
       buttons.forEach(btn => {
@@ -530,14 +539,37 @@ Venue: ${fixture.venue || 'Unknown'}
       // Search form submission
       const searchForm = $('#search-form');
       if (searchForm) {
-        searchForm.addEventListener('submit', (e) => {
+        searchForm.addEventListener('submit', async (e) => {
           e.preventDefault();
-          const date = $('#date')?.value || today;
-          const league = $('#league')?.value || '';
-          fetchFixtures(date, league);
+          const date = $('#date')?.value;
+          const league = $('#league')?.value;
+          
+          if (!date) {
+            showStatus('Please select a date', 'error');
+            return;
+          }
+
+          try {
+            const params = new URLSearchParams();
+            params.append('date', date);
+            if (league) params.append('league', league);
+
+            const response = await fetch(`${API_FIXTURES}?${params}`);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+
+            const data = await response.json();
+            currentFixtures = data.fixtures || [];
+            renderFixtures(currentFixtures);
+            showStatus(`Found ${currentFixtures.length} fixtures`, 'success');
+          } catch (error) {
+            console.error('Error:', error);
+            showStatus('Failed to load fixtures', 'error');
+          }
         });
       }
-
+      
       // Clear button
       const clearBtn = $('#clear-btn');
       if (clearBtn) {
