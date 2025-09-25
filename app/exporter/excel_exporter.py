@@ -27,20 +27,25 @@ class ExcelExporter:
     
     def _add_metadata_sheet(self, writer, match_data: Dict, task_id: str):
         """Add metadata sheet with match information"""
+        # Get match info, handling nested structures
         match_info = match_data.get('match_info', {})
         match_url = match_info.get('url', '')
         
         # Ensure proper URL formation
         if match_url and not match_url.startswith(('http://', 'https://')):
             match_url = urljoin(self.base_url, match_url.lstrip('/'))
-            
+        
+        # Extract team names from the correct location in match_data
+        home_team = match_data.get('home_team', {}).get('name') or match_info.get('home_team', 'Unknown')
+        away_team = match_data.get('away_team', {}).get('name') or match_info.get('away_team', 'Unknown')
+        
         metadata = {
             'Generated': datetime.now().isoformat(),
             'Task ID': task_id,
             'Match URL': match_url,
             'Match ID': match_info.get('match_id', 'Unknown'),
-            'Home Team': match_info.get('team_1', 'Unknown'),
-            'Away Team': match_info.get('team_2', 'Unknown'),
+            'Home Team': home_team,
+            'Away Team': away_team,
             'Data Type': 'Fixtures Only (Player data disabled)',
             'Sheets Included': 'Metadata, Home Team Tables, Away Team Tables'
         }
