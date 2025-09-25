@@ -208,12 +208,3 @@ async def debug_fixtures(date: str, league: Optional[str] = None):
     scraper = FBrefScraper()
     fixtures = scraper.get_fixtures_by_date(date, league)
     return {"fixtures": fixtures}
-
-# Test endpoint to verify parsing logic
-@app.get("/api/test-parsing")
-async def test_parsing():
-    """Test endpoint to verify fixture parsing works"""
-    from app.scraper.fixtures import FixtureScraper
-    scraper = FixtureScraper()
-    result = scraper.test_specific_fixture_parsing()
-    return {"test_result": result}

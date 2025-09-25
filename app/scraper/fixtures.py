@@ -108,10 +108,7 @@ class FixtureScraper:
             print(f"Error scraping fixtures for {date}: {e}")
             return []
         
-
-
-
-    
+  
     def _extract_league_id(self, section) -> Optional[str]:
         """Extract league ID from section HTML"""
         section_html = str(section)
@@ -219,39 +216,3 @@ class FixtureScraper:
             print(f"Error parsing fixture row: {e}")
             return None
         
-
-    def test_specific_fixture_parsing(self):
-        """Test method to verify we can parse the specific fixture structure"""
-        test_html = """
-        <tr data-row="2">
-            <th scope="row" class="left sort_show" data-stat="round"></th>
-            <td class="right sort_show" data-stat="gameweek">6</td>
-            <td class="right " data-stat="start_time" csk="15:00:00"></td>
-            <td class="right " data-stat="home_team">
-                <a href="/en/squads/47c64c55/Crystal-Palace-Stats">Crystal Palace</a>
-            </td>
-            <td class="right iz" data-stat="home_xg"></td>
-            <td class="center iz" data-stat="score"></td>
-            <td class="right iz" data-stat="away_xg"></td>
-            <td class="left " data-stat="away_team">
-                <a href="/en/squads/822bd0ba/Liverpool-Stats">Liverpool</a>
-            </td>
-            <td class="right iz" data-stat="attendance"></td>
-            <td class="left " data-stat="venue">Selhurst Park</td>
-            <td class="left iz" data-stat="referee" csk="2025-09-27"></td>
-            <td class="left " data-stat="match_report">
-                <a href="/en/stathead/matchup/teams/822bd0ba/47c64c55/Liverpool-vs-Crystal-Palace-History">Head-to-Head</a>
-            </td>
-            <td class="left iz" data-stat="notes"></td>
-        </tr>
-        """
-        
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(test_html, 'html.parser')
-        row = soup.find('tr')
-        
-        fixture = self._parse_fixture_row(row, "Premier League", "2025-09-27")
-        print("TEST PARSING RESULT:")
-        print(fixture)
-        
-        return fixture
